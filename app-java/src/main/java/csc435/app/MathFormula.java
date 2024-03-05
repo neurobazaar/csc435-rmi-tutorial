@@ -4,5 +4,5 @@ import java.rmi.Remote;
 import java.rmi.RemoteException;
 
 public interface MathFormula extends Remote {
-    String getFormula(String message) throws RemoteException;
+    public String getFormula(String message) throws RemoteException;
 }

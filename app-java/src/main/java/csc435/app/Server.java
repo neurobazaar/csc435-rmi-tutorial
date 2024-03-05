@@ -1,63 +1,40 @@
 package csc435.app;
 
-import java.io.IOException;
+import java.rmi.registry.LocateRegistry;
+import java.rmi.registry.Registry;
+import java.rmi.server.UnicastRemoteObject;
 import java.util.Scanner;
 
-public class Server {
-    private Integer port;
-    private io.grpc.Server server;
-
-    public Server(String port) {
-        this.port = Integer.parseInt(port);
+public class Server implements MathFormula {
+    public Server() {
+        super();
     }
 
-    public void run() {
-        ServerBuilder<?> serverBuilder = Grpc.newServerBuilderForPort(port, InsecureServerCredentials.create());
-        server = serverBuilder.addService(new MathFormulaService()).build();
-        
-        try {
-            server.start();
-        } catch (IOException e) {
-            return;
+    public String getFormula(String message)
+    {
+        if (message.compareTo("addition") == 0) {
+            return "2+2=4";
         }
-        
-        Thread thread = new Thread(new WaitForQuit());
-        thread.start();
 
-        try {
-            server.awaitTermination();
-        } catch (InterruptedException e) { }
+        if (message.compareTo("multiplication") == 0) {
+            return "2x2=4";
+        }
 
-        try {
-            server.awaitTermination();
-        } catch (InterruptedException e) { }
+        return "???";
     }
 
-    private static class MathFormulaService extends MathFormulaGrpc.MathFormulaImplBase {
-        
-        @Override
-        public void getFormula(RequestMessage requestMessage, StreamObserver<ReplyMessage> respObserver) {
-            respObserver.onNext(buildFormula(requestMessage));
-            respObserver.onCompleted();
+    public static void main(String[] args) {
+        if (args.length != 2) {
+            System.err.println("USE: java Server <IP address> <port>");
+            System.exit(1);
         }
 
-        private ReplyMessage buildFormula(RequestMessage requestMessage) {
-            if (requestMessage.getMessage().compareTo("addition") == 0) {
-                return ReplyMessage.newBuilder().setMessage("2+2=4").build();
-            }
+        try {
+            MathFormula server = new Server();
+            MathFormula stub = (MathFormula) UnicastRemoteObject.exportObject(server, Integer.parseInt(args[1]));
+            Registry registry = LocateRegistry.getRegistry(args[0]);
+            registry.bind("MathFormula", stub);
 
-            if (requestMessage.getMessage().compareTo("multiplication") == 0) {
-                return ReplyMessage.newBuilder().setMessage("2x2=4").build();
-            }
-
-            return ReplyMessage.newBuilder().setMessage("???").build();
-        }
-    }
-
-    private class WaitForQuit implements Runnable {
-
-        @Override
-        public void run() {
             Scanner sc = new Scanner(System.in);
 
             String command;
@@ -68,24 +45,17 @@ public class Server {
                 command = sc.nextLine();
                 
                 if (command.compareTo("quit") == 0) {
-                    server.shutdownNow();
-                    System.out.println("Server terminated!");
                     break;
                 }
             }
 
             sc.close();
-        }
-        
-    }
 
-    public static void main(String[] args) {
-        if (args.length != 2) {
-            System.err.println("USE: java Server <IP address> <port>");
-            System.exit(1);
+            registry.unbind("MathFormula");
+            UnicastRemoteObject.unexportObject(server, false);
+            System.out.println("Server terminated!");
+        } catch (Exception e) {
+            e.printStackTrace();
         }
-
-        Server server = new Server(args[1]);
-        server.run();
     }
 }
